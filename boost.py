@@ -1,12 +1,15 @@
 import sys
 from core.boost import boost_user
 from core.utils import load_file_lines
-from farm.data import read_proxies, read_users
+from core.proxies import fetch_proxies
+from core.utils import read_tokens
+
+
 def main():
   already_boosted = load_file_lines('data/boosted.txt')
-  sub_folder = sys.argv[1] if len(sys.argv) > 1 else None
-  users = read_users(sub_folder)
-  proxies = read_proxies(sub_folder)
+
+  users = read_tokens()
+  proxies = fetch_proxies()
   
   for i, user in enumerate(users):
     if user['email'] not in already_boosted:
