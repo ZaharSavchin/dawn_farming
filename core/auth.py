@@ -28,7 +28,7 @@ def process_user(user_data, proxy):
                 continue
 
             # Используем asyncio.run() для запуска solve_captcha
-            puzzle_ans = asyncio.run(solve_captcha(puzzle_image_base64))
+            puzzle_ans =  asyncio.run(solve_captcha(puzzle_image_base64))
             if not puzzle_ans:
                 print(f"Не удалось решить капчу для {user_data['email']}")
                 continue
@@ -36,7 +36,7 @@ def process_user(user_data, proxy):
             if REGISTER_ONLY:
                 # Регистрация
                 reg_response = register_user(user_data, puzzle_ans, puzzle_id, proxy)
-                if reg_response and reg_response.get('ok'):
+                if reg_response and reg_response.get('success'):
                     print(f"Регистрация успешна для {user_data['email']}!")
                     # Используем asyncio.run() для запуска wait_for_verification_link
                     verification_link = asyncio.run(wait_for_verification_link(user_data['email']))
