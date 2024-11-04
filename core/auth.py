@@ -41,7 +41,7 @@ def process_user(user_data, proxy):
                     # Используем asyncio.run() для запуска wait_for_verification_link
                     verification_link = asyncio.run(wait_for_verification_link(user_data['email']))
                     if verification_link:
-                        requests.get(verification_link, verify=False, headers=HEADERS)
+                        requests.get(verification_link, verify=False, headers=HEADERS, proxies=proxy)
                         return
                     else:
                         print(f"Не удалось получить ссылку на верификацию для {user_data['email']}")
