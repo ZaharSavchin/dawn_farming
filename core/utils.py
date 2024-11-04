@@ -4,8 +4,6 @@ import time
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
 from data.config import RETRY_DELAY
-import copy
-
 
 HEADERS = {
     'Content-Type': 'application/json',
@@ -21,7 +19,7 @@ def load_file_lines(file_path):
         print(f"Error: {file_path} not found.")
         return []
 
-def read_tokens(sub_folder):
+def read_tokens():
     """Загрузка списка юзеров из файла."""
     users = []
     lines = load_file_lines('data/tokens.txt')
@@ -39,27 +37,13 @@ def save_token_to_file(email, token):
         f.write(f"{email}:{token}\n")
     print(f"Token saved for {email}")
 
-def save_not_extracted_account(email, password):
-    """Сохранение данных в файл."""
-    with open('data/not-valid.txt', 'a', encoding='utf-8') as f:
-        f.write(f"{email}:{password}\n")
-    print(f"Not saved for {email}")
-
-def save_not_registered_accounts(email):
-    """Сохранение данных в файл."""
-    with open('data/not-registred.txt', 'a', encoding='utf-8') as f:
-        f.write(f"{email}\n")
-    print(f"Not registred or invalid data {email}")
-
 def make_request(url, proxy=None, method='GET', data=None):
     """Отправка HTTP-запросов с повторами."""
     try:
         if method == 'POST':
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', InsecureRequestWarning)
-                debug_data = copy.copy(data)
-                debug_data["password"] = "******"
-                print(f"Sending POST request to {url} with data: {debug_data}")
+                print(f"Sending POST request to {url} with data: {data}")
                 response = requests.post(url, headers=HEADERS, data=json.dumps(data), proxies=proxy, verify=False)
         else:
             with warnings.catch_warnings():
@@ -74,11 +58,6 @@ def make_request(url, proxy=None, method='GET', data=None):
     except requests.exceptions.HTTPError as e:
         print(f"HTTPError: {e}")
         print(f"Response text: {response.text}")  # This can give clues about the error
-        response_data = response.json()
-        if 'message' in response_data:
-            if response_data['message'] == 'Invalid username or Password!':
-                save_not_registered_accounts(data['username'])
-                return 'not registered'
         time.sleep(RETRY_DELAY)
     except requests.exceptions.RequestException as e:
         print(f"Error during {method} request to {url}: {e}")

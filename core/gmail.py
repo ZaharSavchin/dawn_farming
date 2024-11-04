@@ -16,22 +16,27 @@ def authentificate():
     """Аутентификация в Gmail API."""
     creds = None
     if os.path.exists(TOKEN_PATH):
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+        except Exception as e:
+            print(f"Ошибка при чтении токена: {e}")
+            creds = None
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-        # Проверяем, успешно ли получены учетные данные
+
+        # Сохранение нового токена
         if creds:
-            print("Аутентификация прошла успешно, сохраняем токен...")
             with open(TOKEN_PATH, "w") as token:
                 token.write(creds.to_json())
+            print("Токен успешно сохранен в token-py.json")
         else:
-            print("Ошибка аутентификации. Токен не получен.")
+            print("Ошибка аутентификации. Токен не был получен.")
     return creds
-
 
 def read_email(creds, recipient, process_email):
     """Чтение электронной почты и вызов функции обработки email."""

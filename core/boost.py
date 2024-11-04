@@ -1,4 +1,4 @@
-from dawn import chrome_extension, user_agent, timeout
+from core.dawn import chrome_extension, user_agent, timeout
 import httpx
 boosts = [
     {"twitter_x_id":"twitter_x_id"},
@@ -35,8 +35,8 @@ def boost_user(user, proxy):
 def save_boosted_user(email):
     save_to_file(email, 'data/boosted.txt')
 def save_not_boosted_user(user, proxy):
-    save_to_file(f"{user["email"]}:{user["token"]}", 'data/not_boosted/users.csv')
-    save_to_file(proxy, 'data/not_boosted/proxies.txt')
+    save_to_file(f"{user["email"]}:{user["token"]}", 'data/tokens.txt')
+    save_to_file(proxy, 'data/proxies_not_boosted.txt')
 def save_to_file(line, file):
     with open(file, 'a', encoding='utf-8') as f:
         f.write(f"{line}\n")    

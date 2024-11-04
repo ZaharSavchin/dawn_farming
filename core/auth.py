@@ -6,7 +6,7 @@ from core.proxies import fetch_proxies
 from core.gmail import wait_for_verification_link
 from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS
 from core.captcha import solve_captcha
-from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER_ONLY, MAX_THREADS, REF_CODE
+from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER_ONLY, MAX_THREADS
 
 # Создаем семафор с максимальным количеством потоков
 thread_semaphore = Semaphore(MAX_THREADS)
@@ -41,7 +41,11 @@ def process_user(user_data, proxy):
                     # Используем asyncio.run() для запуска wait_for_verification_link
                     verification_link = asyncio.run(wait_for_verification_link(user_data['email']))
                     if verification_link:
-                        requests.get(verification_link, verify=False, headers=HEADERS, proxies=proxy)
+                        requests.get(verification_link, verify=False, headers=HEADERS)
+                        return
+                    else:
+                        print(f"Не удалось получить ссылку на верификацию для {user_data['email']}")
+
                 else:
                     print(f"Ошибка регистрации для {user_data['email']}")
             else:
@@ -74,7 +78,7 @@ def process_users():
                 "fullname": username,
                 "email": email,
                 "password": password,
-                "refer_code": REF_CODE,
+                "refer_code": 'g6t5rc1e',
                 "mobile": ""
             }
             proxy = proxies.pop(0) if proxies else None
