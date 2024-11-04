@@ -1,4 +1,4 @@
-from farm.dawn import chrome_extension, user_agent, timeout
+from dawn import chrome_extension, user_agent, timeout
 import httpx
 boosts = [
     {"twitter_x_id":"twitter_x_id"},

@@ -23,9 +23,15 @@ def authentificate():
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open(TOKEN_PATH, "w") as token:
-            token.write(creds.to_json())
+        # Проверяем, успешно ли получены учетные данные
+        if creds:
+            print("Аутентификация прошла успешно, сохраняем токен...")
+            with open(TOKEN_PATH, "w") as token:
+                token.write(creds.to_json())
+        else:
+            print("Ошибка аутентификации. Токен не получен.")
     return creds
+
 
 def read_email(creds, recipient, process_email):
     """Чтение электронной почты и вызов функции обработки email."""
