@@ -6,7 +6,7 @@ from core.proxies import fetch_proxies
 from core.gmail import wait_for_verification_link
 from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS
 from core.captcha import solve_captcha
-from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER_ONLY, MAX_THREADS
+from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER_ONLY, MAX_THREADS, REF_CODE
 
 # Создаем семафор с максимальным количеством потоков
 thread_semaphore = Semaphore(MAX_THREADS)
@@ -78,7 +78,7 @@ def process_users():
                 "fullname": username,
                 "email": email,
                 "password": password,
-                "refer_code": 'g6t5rc1e',
+                "refer_code": REF_CODE,
                 "mobile": ""
             }
             proxy = proxies.pop(0) if proxies else None
