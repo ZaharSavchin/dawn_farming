@@ -10,6 +10,15 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
 }
 
+# Check if proxy is working before login
+def test_proxy(proxy):
+    try:
+        response = requests.get('https://api.ipify.org?format=json', proxies=proxy, timeout=5)
+        ip = response.json()['ip']
+        return ip  
+    except Exception:
+        return None
+
 def load_file_lines(file_path):
     """Чтение строк из файла."""
     try:
@@ -37,6 +46,18 @@ def save_token_to_file(email, token):
         f.write(f"{email}:{token}\n")
     print(f"Token saved for {email}")
 
+def save_not_extracted_account(email, password):
+    """Сохранение данных в файл."""
+    with open('data/not-valid.txt', 'a', encoding='utf-8') as f:
+        f.write(f"{email}:{password}\n")
+    print(f"Not saved for {email}")
+
+def save_not_registered_accounts(email):
+    """Сохранение данных в файл."""
+    with open('data/not-registred.txt', 'a', encoding='utf-8') as f:
+        f.write(f"{email}\n")
+    print(f"Not registred or invalid data {email}")
+
 def make_request(url, proxy=None, method='GET', data=None):
     """Отправка HTTP-запросов с повторами."""
     try:
@@ -58,9 +79,13 @@ def make_request(url, proxy=None, method='GET', data=None):
     except requests.exceptions.HTTPError as e:
         print(f"HTTPError: {e}")
         print(f"Response text: {response.text}")  # This can give clues about the error
+        response_data = response.json()
+        if 'message' in response_data:
+            if response_data['message'] == 'Invalid username or Password!':
+                save_not_registered_accounts(data['username'])
+                return 'not registered'
         time.sleep(RETRY_DELAY)
     except requests.exceptions.RequestException as e:
         print(f"Error during {method} request to {url}: {e}")
         time.sleep(RETRY_DELAY)
     return None
-

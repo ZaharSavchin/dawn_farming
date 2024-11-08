@@ -8,6 +8,9 @@ import schedule
 import threading
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
+from data.config import MAX_THREADS
+from core.proxies import fetch_proxies_farm
+from core.utils import read_tokens
 
 from export.sheets import export_points
 
@@ -76,6 +79,10 @@ def get_balance(user, proxy):
         raise err
 
 def get_ip(proxy):
+    proxy = {
+        'http': proxy['http://'],
+        'https': proxy['http://']
+    }
     try:
         response = requests.get('https://api.ipify.org?format=json', proxies=proxy, verify=False)
         return response.json()['ip']
@@ -136,27 +143,26 @@ def find_available_proxy(user_id, proxies, print_ip = False):
                 pass
         
 
-def farm(user, proxies, print_ip, export_sheet):
+def farm(user, proxies, print_ip):
     proxy = find_available_proxy(user['email'], proxies, print_ip)
     if proxy:
-        if print_ip:
-            user_ip = with_retry('getIP/farm', lambda: get_ip(proxy))
+        user_ip = get_ip(proxy)
         with_retry('keepAlive', lambda: keep_alive(user, proxy))
         points = with_retry('getBalance', lambda: get_balance(user, proxy)) or -1
-        print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} {' | IP: ' + user_ip if print_ip else ''}")
+        print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} {' | IP: ' + user_ip}")
         if points == -1:
             used_proxies[proxy['http://']] = None
-            farm(user, proxies, print_ip = True, export_sheet = export_sheet)
-        else:
-            if export_sheet is not None: 
-                export_points(export_sheet, user['email'], points)
+            farm(user, proxies, print_ip = True)
+        # else:
+        #     # if export_sheet is not None: 
+        #     #     export_points(export_sheet, user['email'], points)
         
     else:
         print(f"Can't find a proxy for {user['email']}")
         cleaned_up = cleanup_proxies()
         print(f"Cleaned up {cleaned_up} proxies")
         if cleaned_up > 0:
-            farm(user, proxies, print_ip, export_sheet)
+            farm(user, proxies, print_ip)
     
 
 def cleanup_proxies():
@@ -178,14 +184,14 @@ def reserve_proxies(users, proxies):
     print(f"\nIt took: {((time.time()  - start_time) / 60):.2f} minutes to find proxies {len(users)} users\n") 
 
 # Main farming loop
-def farm_for_all(users, proxies, nThreads, print_ip, export_sheet):
+def farm_for_all(users, proxies, nThreads, print_ip):
     start_time = time.time()
     batch_size = nThreads
     threads = []
     for i in range(0, len(users), batch_size):
         batch = users[i:i + batch_size]
         for user in batch:
-            thread = threading.Thread(target=farm, args=(user, proxies, print_ip, export_sheet))
+            thread = threading.Thread(target=farm, args=(user, proxies, print_ip))
             threads.append(thread)
             thread.start()
 
@@ -193,17 +199,29 @@ def farm_for_all(users, proxies, nThreads, print_ip, export_sheet):
             thread.join()
 
     print(f"\nIt took: {((time.time()  - start_time) / 60):.2f} minutes to farm points for {len(users)} users\n")
+    print('Sleep for 1 minute before next loop...')
 
 
-async def start_farming(users, proxies, nThreads, export_sheet):
+async def start_farming():
+    proxies = fetch_proxies_farm()
+    if not proxies:
+        print("No proxies available.")
+        return
+
+    users = read_tokens()
+    if not users:
+        print("No users with tokens available.")
+        return
+    
+    print(f"Configured {len(proxies)} proxies for {len(users)} users")
 
     # 1st time need to allocate proxies in correct order, sequantually. 
     #farm_for_all(users, proxies, nThreads = 1, print_ip = True, export_sheet = export_sheet, user_group = user_group)
     reserve_proxies(users, proxies)
 
-    farm_for_all(users, proxies, nThreads, False, export_sheet)
+    farm_for_all(users, proxies, MAX_THREADS, False)
 
-    schedule.every(2).minutes.do(farm_for_all, users, proxies, nThreads, False, export_sheet)
+    schedule.every(2).minutes.do(farm_for_all, users, proxies, MAX_THREADS, False)
 
     while True:
         schedule.run_pending()

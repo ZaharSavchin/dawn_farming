@@ -14,7 +14,7 @@ async def solve_captcha(base64_image: str) -> str | None:
                 "content": [
                     {
                         "type": "text",
-                        "text": "What symbols (6 bold) are shown on the image? Please return/tell me ONLY symbols without any other text."
+                        "text": "Which characters are on this image? Look for black characters only ignoring grey. Read characters strictly from left to right, they are placed on a single line. Characters are case-sensitive, look out for the size of each character relative to others and for the typeface of character. The answer should match ^[A-Za-z0-9@#$&=]{6}$ regular expression. Answer with the string only."
                     },
                     {
                         "type": "image_url",
