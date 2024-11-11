@@ -8,9 +8,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-CREDENTIALS_PATH = "data/gmail/credentials.json"
-TOKEN_PATH = "data/gmail/token-py.json"
+SCOPES = ["https://www.googleapis.com/auth/gmail.readonly", 'https://www.googleapis.com/auth/spreadsheets']
+CREDENTIALS_PATH = "data/google/credentials.json"
+TOKEN_PATH = "data/google/token-py.json"
 
 def authentificate():
     """Аутентификация в Gmail API."""
@@ -74,3 +74,87 @@ async def wait_for_verification_link(email: str) -> str | None:
             await asyncio.sleep(RETRY_DELAY)  # Ожидание 3 секунды между попытками
             i += 1
     return verification_link
+
+# def save_to_sheet(logger=None, ip='NONE', username=None, points=None, uptime=None, score='NONE'):
+#     creds = authentificate()
+#     spreadsheet_id = '18ieXul0QrwYlXcbpe-V3lF9DZs4hyKsuXvUYcwzexPk'
+#     current_time = datetime.now()
+#     time = current_time.strftime("%d.%m.%Y | %H:%M")
+#     try:
+#         service = build('sheets', 'v4', credentials=creds)
+#         sheet = service.spreadsheets()
+
+#         # Get all values in the sheet
+#         result = sheet.values().get(spreadsheetId=spreadsheet_id, range="Nodepay!A:D").execute()
+#         rows = result.get('values', [])
+        
+#         # Find the row to update
+#         row_to_update = None
+#         for i, row in enumerate(rows):
+#             if row and row[0] == username:  # Username column is the first column
+#                 row_to_update = i + 1  # Rows are 1-indexed in Google Sheets API
+#                 break
+        
+#         if row_to_update:
+#             # Update the existing row
+#             sheet.values().update(
+#                 spreadsheetId=spreadsheet_id,
+#                 range=f"Nodepay!A{row_to_update}:F{row_to_update}",
+#                 valueInputOption="RAW",
+#                 body={"values": [[username, points, uptime, ip, score, time]]}
+#             ).execute()
+#         else:
+#             # Append a new row
+#             sheet.values().append(
+#                 spreadsheetId=spreadsheet_id,
+#                 range="Nodepay!A:C",
+#                 valueInputOption="RAW",
+#                 insertDataOption="INSERT_ROWS",
+#                 body={"values": [[username, points, uptime, ip, score, time]]}
+#             ).execute()
+
+#     except HttpError as error:
+#         logger.error(f"An error occurred with {username} in GSheet: {error}")
+#         print(f"An error occurred with {username} in GSheet: {error}")
+
+# def save_to_sheet(logger=None, ip='NONE', username=None, points=None, uptime=None, score='NONE'):
+#     creds = authentificate()
+#     spreadsheet_id = '18ieXul0QrwYlXcbpe-V3lF9DZs4hyKsuXvUYcwzexPk'
+#     current_time = datetime.now()
+#     time = current_time.strftime("%d.%m.%Y | %H:%M")
+#     try:
+#         service = build('sheets', 'v4', credentials=creds)
+#         sheet = service.spreadsheets()
+
+#         # Get all values in the sheet
+#         result = sheet.values().get(spreadsheetId=spreadsheet_id, range="Nodepay!A:D").execute()
+#         rows = result.get('values', [])
+        
+#         # Find the row to update
+#         row_to_update = None
+#         for i, row in enumerate(rows):
+#             if row and row[0] == username:  # Username column is the first column
+#                 row_to_update = i + 1  # Rows are 1-indexed in Google Sheets API
+#                 break
+        
+#         if row_to_update:
+#             # Update the existing row
+#             sheet.values().update(
+#                 spreadsheetId=spreadsheet_id,
+#                 range=f"Nodepay!A{row_to_update}:F{row_to_update}",
+#                 valueInputOption="RAW",
+#                 body={"values": [[username, points, uptime, ip, score, time]]}
+#             ).execute()
+#         else:
+#             # Append a new row
+#             sheet.values().append(
+#                 spreadsheetId=spreadsheet_id,
+#                 range="Nodepay!A:C",
+#                 valueInputOption="RAW",
+#                 insertDataOption="INSERT_ROWS",
+#                 body={"values": [[username, points, uptime, ip, score, time]]}
+#             ).execute()
+
+#     except HttpError as error:
+#         logger.error(f"An error occurred with {username} in GSheet: {error}")
+#         print(f"An error occurred with {username} in GSheet: {error}")
