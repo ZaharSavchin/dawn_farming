@@ -1,12 +1,13 @@
 import time
 import asyncio
 import requests
-from threading import Thread, Semaphore  # Добавляем Semaphore для ограничения потоков
+from threading import Thread, Semaphore 
+from core.boost import boost_user
 from core.proxies import fetch_proxies
 from core.gmail import wait_for_verification_link
-from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS
+from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS, test_proxy
 from core.captcha import solve_captcha
-from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER_ONLY, MAX_THREADS, REF_CODE
+from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER, MAX_THREADS, REF_CODE, BOOST_USERS
 
 # Создаем семафор с максимальным количеством потоков
 thread_semaphore = Semaphore(MAX_THREADS)
@@ -33,7 +34,7 @@ def process_user(user_data, proxy):
                 print(f"Не удалось решить капчу для {user_data['email']}")
                 continue
             
-            if REGISTER_ONLY:
+            if REGISTER:
                 # Регистрация
                 reg_response = register_user(user_data, puzzle_ans, puzzle_id, proxy)
                 if reg_response and reg_response.get('success'):
@@ -42,7 +43,34 @@ def process_user(user_data, proxy):
                     verification_link = asyncio.run(wait_for_verification_link(user_data['email']))
                     if verification_link:
                         requests.get(verification_link, verify=False, headers=HEADERS, proxies=proxy)
-                        return
+
+                        # Логин
+                        for attempt in range(MAX_RETRIES):
+                            puzzle_id, puzzle_image_base64 = fetch_puzzle(proxy)
+                            if not puzzle_id or not puzzle_image_base64:
+                                print(f"Не удалось получить пазл для {user_data['email']}")
+                                continue
+
+                            # Используем asyncio.run() для запуска solve_captcha
+                            puzzle_ans =  asyncio.run(solve_captcha(puzzle_image_base64))
+                            if not puzzle_ans:
+                                print(f"Не удалось решить капчу для {user_data['email']}")
+                                continue
+
+                            login_response = login_user(user_data, puzzle_ans, puzzle_id, proxy)
+                            if login_response and login_response.get('data', {}).get('token'):
+                                token = login_response['data']['token']
+                                user_data['token'] = token
+                                save_token_to_file(user_data['email'], token)
+                                user = {
+                                    'email': user_data['email'],
+                                    'token': token,
+                                }
+                                if BOOST_USERS:
+                                    boost_user(user, proxy)
+                                return
+                            print(f'Login atteempt {attempt + 1}/{MAX_RETRIES}')
+                        print(f"Максимальное количество попыток для {user_data['email']}")
                     else:
                         print(f"Не удалось получить ссылку на верификацию для {user_data['email']}")
 
@@ -53,7 +81,14 @@ def process_user(user_data, proxy):
                 login_response = login_user(user_data, puzzle_ans, puzzle_id, proxy)
                 if login_response and login_response.get('data', {}).get('token'):
                     token = login_response['data']['token']
+                    user_data['token'] = token
                     save_token_to_file(user_data['email'], token)
+                    user = {
+                        'email': user_data['email'],
+                        'token': token,
+                    }
+                    if BOOST_USERS:
+                        boost_user(user, proxy)
                     return
         print(f"Максимальное количество попыток для {user_data['email']}")
     finally:
