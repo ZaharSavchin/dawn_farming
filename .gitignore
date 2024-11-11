@@ -2,8 +2,17 @@
 /data/gmail/main/credentials.json
 /data/gmail/main/token.json
 /src/projects/data/*
+/data/credentials.json
+/data/token-py.json
 results.txt
 tokens.txt
+proxies.txt
+users.txt
+boosted.txt
+already-registered.txt
+already-registred.txt
+not-registred.txt
+not-registered.txt
 /.history
 
 # Byte-compiled / optimized / DLL files

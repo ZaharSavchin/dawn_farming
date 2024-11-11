@@ -8,11 +8,10 @@ import schedule
 import threading
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
-from data.config import MAX_THREADS
+from data.config import MAX_THREADS, EXPORT_DATA
 from core.proxies import fetch_proxies_farm
 from core.utils import read_tokens
-
-from export.sheets import export_points
+from core.google import save_to_sheet
 
 find_proxy_lock = threading.Lock()
 
@@ -129,7 +128,7 @@ def find_available_proxy(user_id, proxies, print_ip = False):
                         print(f'user {user_id} got {ip}')
                     return proxy
                 else:
-                    print(f'No IP for ${user_id}. Next loop')
+                    print(f'No IP for {user_id}. Next loop')
                     used_proxies[next_proxy] = None
                     find_proxy_lock.release()
                     return find_available_proxy(user_id, proxies)
@@ -153,9 +152,9 @@ def farm(user, proxies, print_ip):
         if points == -1:
             used_proxies[proxy['http://']] = None
             farm(user, proxies, print_ip = True)
-        # else:
-        #     # if export_sheet is not None: 
-        #     #     export_points(export_sheet, user['email'], points)
+        else:
+            if EXPORT_DATA: 
+                save_to_sheet(user['email'], points, user_ip)
         
     else:
         print(f"Can't find a proxy for {user['email']}")

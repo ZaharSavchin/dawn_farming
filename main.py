@@ -1,15 +1,22 @@
 import asyncio
 
 from core.auth import process_users
-from core.dawn import start_farming
-from data.config import FARM_ONLY
+from core.farm import start_farming
+from data.config import FARM_ONLY, VERIFY_ONLY
+from core.verify import verify_users
 
 
 if __name__ == '__main__':
     try:
-        if FARM_ONLY == False:
-            process_users()
+        if VERIFY_ONLY:
+            print('Starting verification only')
+            verify_users()
         else:
-            asyncio.run(start_farming())
+            if FARM_ONLY == False:
+                print('Starting authentification')
+                process_users()
+            else:
+                print('Starting farm')
+                asyncio.run(start_farming())
     except (KeyboardInterrupt, SystemExit):
         print("Program terminated by user.")

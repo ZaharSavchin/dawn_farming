@@ -50,13 +50,19 @@ def save_not_extracted_account(email, password):
     """Сохранение данных в файл."""
     with open('data/not-valid.txt', 'a', encoding='utf-8') as f:
         f.write(f"{email}:{password}\n")
-    print(f"Not saved for {email}")
+    print(f"Token didnt save for {email}")
 
 def save_not_registered_accounts(email):
     """Сохранение данных в файл."""
-    with open('data/not-registred.txt', 'a', encoding='utf-8') as f:
+    with open('data/not-registered.txt', 'a', encoding='utf-8') as f:
         f.write(f"{email}\n")
     print(f"Not registred or invalid data {email}")
+
+def save_already_registered_accounts(email):
+    """Сохранение данных в файл."""
+    with open('data/already-registered.txt', 'a', encoding='utf-8') as f:
+        f.write(f"{email}\n")
+    print(f"Already registered {email}")
 
 def make_request(url, proxy=None, method='GET', data=None):
     """Отправка HTTP-запросов с повторами."""
@@ -84,6 +90,10 @@ def make_request(url, proxy=None, method='GET', data=None):
             if response_data['message'] == 'Invalid username or Password!':
                 save_not_registered_accounts(data['username'])
                 return 'not registered'
+        if 'message' in response_data:
+            if response_data['message'] == 'email already exists':
+                save_already_registered_accounts(data['email'])
+                return 'already registered'
         time.sleep(RETRY_DELAY)
     except requests.exceptions.RequestException as e:
         print(f"Error during {method} request to {url}: {e}")

@@ -4,7 +4,7 @@ import requests
 from threading import Thread, Semaphore 
 from core.boost import boost_user
 from core.proxies import fetch_proxies
-from core.gmail import wait_for_verification_link
+from core.google import wait_for_verification_link
 from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS, test_proxy
 from core.captcha import solve_captcha
 from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER, MAX_THREADS, REF_CODE, BOOST_USERS
@@ -37,6 +37,8 @@ def process_user(user_data, proxy):
             if REGISTER:
                 # Регистрация
                 reg_response = register_user(user_data, puzzle_ans, puzzle_id, proxy)
+                if reg_response == 'already registered':
+                    return
                 if reg_response and reg_response.get('success'):
                     print(f"Регистрация успешна для {user_data['email']}!")
                     # Используем asyncio.run() для запуска wait_for_verification_link
@@ -45,7 +47,8 @@ def process_user(user_data, proxy):
                         requests.get(verification_link, verify=False, headers=HEADERS, proxies=proxy)
 
                         # Логин
-                        for attempt in range(MAX_RETRIES):
+                        login_attempt = 0
+                        for login_attempt in range(MAX_RETRIES):
                             puzzle_id, puzzle_image_base64 = fetch_puzzle(proxy)
                             if not puzzle_id or not puzzle_image_base64:
                                 print(f"Не удалось получить пазл для {user_data['email']}")
@@ -58,6 +61,8 @@ def process_user(user_data, proxy):
                                 continue
 
                             login_response = login_user(user_data, puzzle_ans, puzzle_id, proxy)
+                            if login_response == 'not registered':
+                                return
                             if login_response and login_response.get('data', {}).get('token'):
                                 token = login_response['data']['token']
                                 user_data['token'] = token
@@ -69,7 +74,7 @@ def process_user(user_data, proxy):
                                 if BOOST_USERS:
                                     boost_user(user, proxy)
                                 return
-                            print(f'Login atteempt {attempt + 1}/{MAX_RETRIES}')
+                            print(f'Login attempt {login_attempt + 1}/{MAX_RETRIES}')
                         print(f"Максимальное количество попыток для {user_data['email']}")
                     else:
                         print(f"Не удалось получить ссылку на верификацию для {user_data['email']}")
@@ -79,6 +84,8 @@ def process_user(user_data, proxy):
             else:
                 # Логин
                 login_response = login_user(user_data, puzzle_ans, puzzle_id, proxy)
+                if login_response == 'not registered':
+                    return
                 if login_response and login_response.get('data', {}).get('token'):
                     token = login_response['data']['token']
                     user_data['token'] = token

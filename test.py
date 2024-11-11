@@ -1,4 +1,4 @@
-from core.gmail import authentificate, read_email
+from core.google import authentificate, read_email
 
 def process_email(body):
     print(body)

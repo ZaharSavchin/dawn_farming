@@ -1,4 +1,4 @@
-from core.dawn import chrome_extension, user_agent, timeout
+from core.farm import chrome_extension, user_agent, timeout
 import requests
 
 boosts = [
