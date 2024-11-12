@@ -16,7 +16,7 @@ import random
 # Disable TLS warnings (not recommended for production)
 os.environ['PYTHONWARNINGS'] = 'ignore:Unverified HTTPS request'
 
-timeout = httpx.Timeout(10.0, connect=10.0, read=15.0, write=10.0)
+timeout = httpx.Timeout(20.0, connect=20.0, read=30.0, write=20.0)
 
 chrome_extension = {
     'id': 'fpdkjdnhkakefebpekbdhillbhonfjjp',
@@ -75,16 +75,20 @@ async def get_balance(user, proxy):
             raise
 
 async def get_ip(proxy, user):
-    try:
+    async def fetch_ip():
         async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
-            response = await client.get('https://api.ipify.org?format=json')
+            response = await client.get('https://api.ipify.org?format=json', timeout=timeout)
             return response.json()['ip']
+
+    try:
+        return await with_retry('getIP', fetch_ip)
     except httpx.ProxyError as err:
         print(f"Proxy error for {user}: {err}. Retrying with a new proxy...")
         raise
     except Exception as err:
         print(f"Error getting IP for {user}: {err}")
         raise
+
 
 async def with_retry(name, code, retries=0):
     if retries < 5:
