@@ -4,10 +4,11 @@ import time
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
 from data.config import RETRY_DELAY
+from pyuseragents import random as random_useragent
 
 HEADERS = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'User-Agent': random_useragent(),
 }
 
 # Check if proxy is working before login

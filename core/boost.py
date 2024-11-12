@@ -1,5 +1,6 @@
-from core.farm import chrome_extension, user_agent, timeout
+from core.farm import chrome_extension, timeout
 import requests
+from pyuseragents import random as random_useragent
 
 boosts = [
     {"twitter_x_id":"twitter_x_id"},
@@ -13,7 +14,7 @@ def boost_user(user, proxy):
         "origin": f"chrome-extension://{chrome_extension['id']}",
         "authorization": f"Bearer {user['token']}",
         "content-type": "application/json",
-        "user-agent": user_agent
+        "user-agent": random_useragent()
     }
     email = user["email"]
     successful_boosts = 0

@@ -2,7 +2,7 @@ API_KEY = 'API_KEY' # ChatGpt API_KEY
 MAX_RETRIES = 5 # Кол-во повторных попыток регистрации или логина
 RETRY_DELAY = 3 # Пауза между запросами в секундах
 REGISTER = False # False = Login only | True = Register, then login
-MAX_THREADS = 10  # Укажите количество потоков
+MAX_THREADS = 15  # Укажите количество потоков
 FARM_ONLY = True # Set True if you want only farm points
 REF_CODE = 'REF_CODE' # Referal code for registration
 BOOST_USERS = False # Set True if you want to boost users
