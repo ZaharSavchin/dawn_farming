@@ -1,4 +1,4 @@
-﻿google-api-python-client==2.149.0
+google-api-python-client==2.149.0
 oauthlib==3.2.2
 openai==1.51.1
 requests==2.32.3
@@ -7,3 +7,4 @@ google_auth_oauthlib==1.2.1
 aiohttp==3.10.10
 schedule==1.2.2
 httpx==0.27.2
+pyuseragents==1.0.5
