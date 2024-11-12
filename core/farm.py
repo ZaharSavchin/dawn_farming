@@ -54,7 +54,7 @@ async def get_balance(user, proxy):
         "origin": f"chrome-extension://{chrome_extension['id']}",
         "authorization": f"Bearer {user['token']}",
         "content-type": "application/json",
-        "user-agent": user_agent
+        "user-agent": random_useragent()
     }
 
     async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
