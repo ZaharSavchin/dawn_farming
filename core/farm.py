@@ -79,8 +79,11 @@ async def get_ip(proxy, user):
         async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
             response = await client.get('https://api.ipify.org?format=json')
             return response.json()['ip']
+    except httpx.ProxyError as err:
+        print(f"Proxy error for {user}: {err}. Retrying with a new proxy...")
+        raise
     except Exception as err:
-        print(f"Can't get IP for {user}")
+        print(f"Error getting IP for {user}: {err}")
         raise
 
 async def with_retry(name, code, retries=0):
@@ -96,33 +99,37 @@ async def with_retry(name, code, retries=0):
         return None
 
 async def find_available_proxy(user_id, proxies, print_ip=False):
-    proxy_url = find_key_by_value(used_proxies, user_id)
-    if proxy_url is not None:
-        next_proxy = {
-            'http://': proxy_url,
-            'https://': proxy_url
-        }
-    else:
-        # Find a proxy whose URL is not yet used
-        next_proxy = next((p for p in proxies if p['http://'] not in used_proxies), None)
+    for attempt in range(5):
+        try:
+            proxy_url = find_key_by_value(used_proxies, user_id)
+            if proxy_url is not None:
+                next_proxy = {
+                    'http://': proxy_url,
+                    'https://': proxy_url
+                }
+            else:
+                # Find a proxy whose URL is not yet used
+                next_proxy = next((p for p in proxies if p['http://'] not in used_proxies), None)
 
-    if next_proxy:
-        proxy = next_proxy
-        ip = await with_retry('getIP', lambda: get_ip(proxy, user_id))
-        if ip is not None:
-            # Use the 'http://' key as the hashable identifier for the proxy
-            proxy_key = next_proxy['http://']
-            used_proxies[proxy_key] = user_id
-            if print_ip:
-                print(f'user {user_id} got {ip}')
-            return proxy
-        else:
-            print(f'No IP for {user_id}. Next loop')
-            used_proxies[next_proxy['http://']] = None
-            return await find_available_proxy(user_id, proxies)
-    else:
-        print("No available proxies")
-        return None
+            if next_proxy:
+                proxy = next_proxy
+                ip = await with_retry('getIP', lambda: get_ip(proxy, user_id))
+                if ip is not None:
+                    # Use the 'http://' key as the hashable identifier for the proxy
+                    proxy_key = next_proxy['http://']
+                    used_proxies[proxy_key] = user_id
+                    if print_ip:
+                        print(f'user {user_id} got {ip}')
+                    return proxy
+                else:
+                    print(f'No IP for {user_id}. Next loop')
+                    used_proxies[next_proxy['http://']] = None
+                    return await find_available_proxy(user_id, proxies)
+                    
+        except httpx.ProxyError:
+            continue  # Try the next proxy
+    print("No available proxies")
+    return None
 
 def find_key_by_value(my_dict, target_value):
     for key, value in my_dict.items():
