@@ -1,6 +1,7 @@
 import base64
 import os.path
 import asyncio
+import re
 from datetime import datetime
 from data.config import RETRY_DELAY
 from google.auth.transport.requests import Request
@@ -59,10 +60,10 @@ def read_email(creds, recipient, process_email):
 
 def extract_verification_link(email_body: str) -> str | None:
     """Извлечение ссылки на верификацию из тела письма."""
-    start = email_body.find('https://www.aeropres.in/chromeapi/dawn/v1/user/verifylink?key=')
-    if start > 0:
-        end = email_body.find('</a></p>', start)
-        return email_body[start:end]
+    pattern = r'<a href="(https://.*?\.sendgrid\.net/ls/click.*?)"><button'
+    match = re.search(pattern, email_body)
+    if match:
+        return match.group(1)
     return None
 
 async def wait_for_verification_link(email: str) -> str | None:

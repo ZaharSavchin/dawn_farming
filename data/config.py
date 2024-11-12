@@ -2,7 +2,7 @@ API_KEY = 'sk-proj-RYhIevPoZBNAV5KFr2pfoW1ufudi18T-PUYSwri3Oz1auKYla_5qnoZtpz1ya
 MAX_RETRIES = 5 # Кол-во повторных попыток регистрации или логина
 RETRY_DELAY = 3 # Пауза между запросами в секундах
 REGISTER = False # False = Login only | True = Register, then login
-MAX_THREADS = 10  # Укажите количество потоков
+MAX_THREADS = 15  # Укажите количество потоков
 FARM_ONLY = True # Set True if you want only farm points
 REF_CODE = 'nxvz54eh' # Referal code for registration
 BOOST_USERS = False # Set True if you want to boost users
