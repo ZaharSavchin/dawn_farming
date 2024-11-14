@@ -6,17 +6,16 @@ from datetime import datetime
 import schedule
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
-from data.config import MAX_THREADS, EXPORT_DATA
+from data.config import MAX_THREADS, EXPORT_DATA, MAX_RETRIES
 from core.proxies import fetch_proxies_farm
 from core.utils import read_tokens
 from core.google import save_to_sheet
 from pyuseragents import random as random_useragent
 import random
 
-# Disable TLS warnings (not recommended for production)
 os.environ['PYTHONWARNINGS'] = 'ignore:Unverified HTTPS request'
 
-timeout = httpx.Timeout(20.0, connect=20.0, read=30.0, write=20.0)
+timeout = httpx.Timeout(20.0, connect=20.0, read=120.0, write=20.0)
 
 chrome_extension = {
     'id': 'fpdkjdnhkakefebpekbdhillbhonfjjp',
@@ -24,7 +23,9 @@ chrome_extension = {
 }
 
 warnings.simplefilter('ignore', InsecureRequestWarning)
+user_proxy_map = {}
 used_proxies = {}
+
 
 async def keep_alive(user, proxy):
     url = "https://www.aeropres.in/chromeapi/dawn/v1/userreward/keepalive"
@@ -41,12 +42,19 @@ async def keep_alive(user, proxy):
         "_v": chrome_extension['version']
     }
 
-    async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
+    retries = MAX_RETRIES
+    for attempt in range(retries):
         try:
-            await client.post(url, headers=headers, json=body)
+            async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
+                await client.post(url, headers=headers, json=body, timeout=timeout)
+            return  # Exit if successful
+        except httpx.ReadTimeout:
+            print(f"Timeout in keep_alive for {user['email']} on attempt {attempt + 1}/{retries}")
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
         except Exception as err:
-            print(f"keepAlive request failed for {user['email']}: {err}")
-            raise
+            print(f"keep_alive request failed for {user['email']}: {err}")
+            return -1
+
 
 async def get_balance(user, proxy):
     url = "https://www.aeropres.in/api/atom/v1/userreferral/getpoint"
@@ -57,22 +65,31 @@ async def get_balance(user, proxy):
         "user-agent": random_useragent()
     }
 
-    async with httpx.AsyncClient(proxies=proxy, verify=False) as client:
-        try:
-            response = await client.get(url, headers=headers)
-            data = response.json()
-            points = sum([
-                data['data']['rewardPoint'].get('points', 0),
-                data['data']['rewardPoint'].get('registerpoints', 0),
-                data['data']['rewardPoint'].get('signinpoints', 0),
-                data['data']['rewardPoint'].get('twitter_x_id_points', 0),
-                data['data']['rewardPoint'].get('discordid_points', 0),
-                data['data']['rewardPoint'].get('telegramid_points', 0),
-                data['data']['referralPoint'].get('commission', 0)
-            ])
-            return points
-        except Exception as err:
-            raise
+    retries = MAX_RETRIES
+    async with httpx.AsyncClient(proxies=proxy, verify=False, timeout=timeout) as client:
+        for attempt in range(retries):
+            try:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()  # Ensure we catch non-2xx errors
+                data = response.json()
+                points = sum([
+                    data['data']['rewardPoint'].get('points', 0),
+                    data['data']['rewardPoint'].get('registerpoints', 0),
+                    data['data']['rewardPoint'].get('signinpoints', 0),
+                    data['data']['rewardPoint'].get('twitter_x_id_points', 0),
+                    data['data']['rewardPoint'].get('discordid_points', 0),
+                    data['data']['rewardPoint'].get('telegramid_points', 0),
+                    data['data']['referralPoint'].get('commission', 0)
+                ])
+                return points
+            except httpx.ReadTimeout:
+                print(f"Timeout in get_balance for {user['email']} on attempt {attempt + 1}/{retries}")
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            except Exception as err:
+                print(f"Failed to get balance for {user['email']}: {err}")
+                return -1
+        return -1  # Return -1 if all retries fail
+
 
 async def get_ip(proxy, user):
     async def fetch_ip():
@@ -81,107 +98,95 @@ async def get_ip(proxy, user):
             return response.json()['ip']
 
     try:
-        return await with_retry('getIP', fetch_ip)
+        return await fetch_ip()
     except httpx.ProxyError as err:
-        print(f"Proxy error for {user}: {err}. Retrying with a new proxy...")
-        raise
-    except Exception as err:
-        print(f"Error getting IP for {user}: {err}")
-        raise
-
-
-async def with_retry(name, code, retries=0):
-    if retries < 5:
-        try:
-            return await code()
-        except:
-            await asyncio.sleep(0.5)
-            print(f"Retrying {retries} ({name})...")
-            return await with_retry(name, code, retries + 1)
-    else:
-        print(f"Reached max retries for {name}")
+        print(f"Proxy error для {user}: {err}.")
         return None
+    except Exception as err:
+        print(f"Другая ошибка для {user['email']}: {err}")
+        raise
 
-async def find_available_proxy(user_id, proxies, print_ip=False):
-    for attempt in range(5):
-        try:
-            proxy_url = find_key_by_value(used_proxies, user_id)
-            if proxy_url is not None:
-                next_proxy = {
-                    'http://': proxy_url,
-                    'https://': proxy_url
-                }
-            else:
-                # Find a proxy whose URL is not yet used
-                next_proxy = next((p for p in proxies if p['http://'] not in used_proxies), None)
 
-            if next_proxy:
-                proxy = next_proxy
-                ip = await with_retry('getIP', lambda: get_ip(proxy, user_id))
-                if ip is not None:
-                    # Use the 'http://' key as the hashable identifier for the proxy
-                    proxy_key = next_proxy['http://']
-                    used_proxies[proxy_key] = user_id
-                    if print_ip:
-                        print(f'user {user_id} got {ip}')
-                    return proxy
-                else:
-                    print(f'No IP for {user_id}. Next loop')
-                    used_proxies[next_proxy['http://']] = None
-                    return await find_available_proxy(user_id, proxies)
-                    
-        except httpx.ProxyError:
-            continue  # Try the next proxy
-    print("No available proxies")
-    return None
-
-def find_key_by_value(my_dict, target_value):
-    for key, value in my_dict.items():
-        if value == target_value:
-            return key
-    return None  # Return None if the value is not found
-
-async def reserve_proxies(users, proxies): 
-    start_time = time.time()
-    for user in users:
-        await find_available_proxy(user['email'], proxies, print_ip = True)
-
-    print(f"\nIt took: {((time.time()  - start_time) / 60):.2f} minutes to find proxies {len(users)} users\n") 
-
-async def cleanup_proxies():
-    before_clean_up = len(used_proxies)
-    for proxy, user_id in list(used_proxies.items()):
-        if user_id is None:
-            del used_proxies[proxy]
-    after_clean_up = len(used_proxies)
-    print(f"Cleaned up {before_clean_up - after_clean_up} proxies")
 
 def format_date():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-async def farm(user, proxies, print_ip):
-    proxy = await find_available_proxy(user['email'], proxies, print_ip)
-    if proxy:
-        user_ip = await get_ip(proxy, user['email'])
-        await with_retry('keepAlive', lambda: keep_alive(user, proxy))
-        points = await with_retry('getBalance', lambda: get_balance(user, proxy)) or -1
-        print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} {' | IP: ' + user_ip}")
-        if points == -1:
-            used_proxies[proxy['http://']] = None
-            await farm(user, proxies, print_ip=True)
-        else:
-            if EXPORT_DATA:
-                save_to_sheet(user['email'], points, user_ip)
-    else:
-        print(f"Can't find a proxy for {user['email']}")
-        await cleanup_proxies()
-        await farm(user, proxies, print_ip)
 
-async def farm_for_all(users, proxies, n_tasks, print_ip):
-    start_time = time.time()
-    tasks = [farm(user, proxies, print_ip) for user in users[:n_tasks]]
-    await asyncio.gather(*tasks)
-    print(f"\nIt took: {((time.time() - start_time) / 60):.2f} minutes to farm points for {len(users)} users\n")
+async def get_proxy(user, proxies, user_proxy_map):
+    proxy = user_proxy_map.get(user['email'])
+    if proxy:
+        try:
+            user_ip = await get_ip(proxy, user['email'])
+            if user_ip:
+                print(f"Using another proxy")
+                return proxy, user_ip
+            else:
+                print(f"Existing proxy {proxy} for {user['email']} is not working. Selecting a new one.")
+        except Exception as err:
+            print(f"Error getting IP for {user['email']} with proxy {proxy}: {err}. Selecting a new one.")
+
+    for attempt in range(MAX_RETRIES):
+        proxy = random.choice(proxies)
+        user_proxy_map[user['email']] = proxy
+
+        try:
+            user_ip = await get_ip(proxy, user['email'])
+            if user_ip:
+                print(f"Assigned new proxy to {user['email']}")
+                return proxy, user_ip
+            else:
+                print(f"Proxy {proxy} for {user['email']} did not return a valid IP. Retrying...")
+        except Exception as err:
+            print(f"Error getting IP for {user['email']} with new proxy {proxy}: {err}. Retrying...")
+
+        await asyncio.sleep(2 ** attempt)
+
+    print(f"Failed to assign a working proxy for {user['email']} after {MAX_RETRIES} attempts.")
+    return None
+
+
+    proxy_result = await get_proxy(user, proxies, user_proxy_map)
+    if proxy_result is None:
+     print(f"Failed to get proxy for {user['email']}")
+    else:
+        proxy, user_ip = proxy_result
+
+
+async def farm(user, proxies, print_ip, user_proxy_map, semaphore):
+    success = False
+    iteration = 0  # Track the iteration count
+    while True:
+        iteration += 1
+        async with semaphore:
+            for attempt in range(MAX_RETRIES):
+                proxy_result = await get_proxy(user, proxies, user_proxy_map)
+
+                if proxy_result is None:
+                    print(f"Failed to get a working proxy for {user['email']} on attempt {attempt + 1}/{MAX_RETRIES}")
+                    continue
+
+                proxy, user_ip = proxy_result
+                if user_ip:
+                    await keep_alive(user, proxy)
+                    points = await get_balance(user, proxy) or -1
+                    print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} | IP: {user_ip}")
+
+                    if points == -1:
+                        user_proxy_map[user['email']] = None
+                    else:
+                        if iteration % 10 == 1 and EXPORT_DATA:
+                            save_to_sheet(user['email'], points, user_ip)
+                        success = True
+                        break
+
+                print(f"Retrying ping for {user['email']} (Attempt {attempt + 1}/{MAX_RETRIES})")
+                await asyncio.sleep(2 ** attempt)
+
+            if not success:
+                print(f"All ping attempts failed for {user['email']}")
+
+            await asyncio.sleep(60, 180)
+
 
 async def start_farming():
     proxies = fetch_proxies_farm()
@@ -193,12 +198,19 @@ async def start_farming():
     if not users:
         print("No users with tokens available.")
         return
-    
+
+    if len(proxies) < len(users):
+        print("Cant start the code. Users more then proxies")
+        return
+
+    # Semaphore to control concurrency
+    semaphore = asyncio.Semaphore(len(users))
+
+    # User to proxy mapping
+    user_proxy_map = {}
 
     print(f"Configured {len(proxies)} proxies for {len(users)} users")
-    await reserve_proxies(users, proxies)
-    await farm_for_all(users, proxies, len(users), False)
 
-    while True:
-        await farm_for_all(users, proxies, len(users), False)
-        await asyncio.sleep(5)
+    # Start a separate farming task for each user
+    tasks = [farm(user, proxies, False, user_proxy_map, semaphore) for user in users]
+    await asyncio.gather(*tasks)
