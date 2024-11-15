@@ -169,7 +169,7 @@ async def farm(user, proxies, print_ip, user_proxy_map, semaphore):
                 if user_ip:
                     await keep_alive(user, proxy)
                     points = await get_balance(user, proxy) or -1
-                    print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} | IP: {user_ip}")
+                    print(f"{user['email']:<40} | {points:.2f} | {format_date():<15} {' | IP: ' + user_ip if user_ip else ''}")
 
                     if points == -1:
                         user_proxy_map[user['email']] = None
