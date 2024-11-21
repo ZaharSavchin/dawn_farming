@@ -27,4 +27,15 @@ def fetch_proxies_farm():
             print(f"Неверный формат прокси: {line}")
     return proxies
 
-
+def fetch_proxies_aiohttp():
+    """Загрузка списка прокси из файла."""
+    proxies = []
+    lines = load_file_lines('data/proxies.txt')
+    for line in lines:
+        try:
+            ip, port, user, password = line.split(':')
+            # proxy_url = f"http://{user}:{password}@{ip}:{port}"
+            proxies.append(f"http://{user}:{password}@{ip}:{port}")
+        except ValueError:
+            print(f"Неверный формат прокси: {line}")
+    return proxies

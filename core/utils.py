@@ -38,7 +38,7 @@ def read_tokens():
             email, token = line.split(':')
             users.append({'email': email, 'token': token})
         except ValueError:
-            print(f"Неверный формат прокси: {line}")
+            print(f"Неверный формат данных: {line}")
     return users
 
 def save_token_to_file(email, token):
@@ -49,7 +49,7 @@ def save_token_to_file(email, token):
 
 def save_not_extracted_account(email, password):
     """Сохранение данных в файл."""
-    with open('data/not-valid.txt', 'a', encoding='utf-8') as f:
+    with open('data/not-extracted.txt', 'a', encoding='utf-8') as f:
         f.write(f"{email}:{password}\n")
     print(f"Token didnt save for {email}")
 
@@ -88,7 +88,7 @@ def make_request(url, proxy=None, method='GET', data=None):
         print(f"Response text: {response.text}")  # This can give clues about the error
         response_data = response.json()
         if 'message' in response_data:
-            if response_data['message'] == 'Invalid username or Password!':
+            if response_data['message'] == 'Invalid username or Password!' or response_data['message'] == 'user not found':
                 save_not_registered_accounts(data['username'])
                 return 'not registered'
         if 'message' in response_data:
