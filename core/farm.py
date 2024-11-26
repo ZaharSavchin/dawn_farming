@@ -52,7 +52,9 @@ async def keep_alive(user, proxy):
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(url, headers=headers, json=body, proxy=proxy, ssl=False) as response:
                     if response.status == 200:
-                        return  # Exit if successful
+                        return
+                    if response.status == 427:
+                        logger.error(f"{user['email']} | Token expired")
         except asyncio.TimeoutError:
             logger.warning(f"Timeout in keep_alive for {user['email']} on attempt {attempt + 1}/{MAX_RETRIES}")
             await asyncio.sleep(2 ** attempt)  # Exponential backoff

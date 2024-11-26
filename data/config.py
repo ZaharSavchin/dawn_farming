@@ -2,7 +2,7 @@
 # Script configuration #
 ##########################################################################
 
-FARM_ONLY = True # Set True if you want only farm points
+FARM_ONLY = False # Set True if you want only farm points
 REGISTER = False # False = Login only | True = Register, then login
 BOOST_USERS = False # Set True if you want to boost users
 VERIFY_ONLY = False # True = Verify only | False = Register or farm
