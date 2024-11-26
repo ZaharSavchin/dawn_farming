@@ -1,15 +1,15 @@
 import time
 import asyncio
 import requests
-from threading import Thread, Semaphore 
-from core.boost import boost_user
+from threading import Thread, Semaphore
+
 from core.proxies import fetch_proxies
 from core.google import wait_for_verification_link
 from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS, test_proxy, save_token_to_db
 from core.captcha import solve_captcha
 from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER, MAX_THREADS, REF_CODE, BOOST_USERS
+from pyuseragents import random as random_useragent
 
-# Создаем семафор с максимальным количеством потоков
 thread_semaphore = Semaphore(MAX_THREADS)
 
 APP_ID = "66fa9fc4bc2ec041135db33b"
@@ -17,6 +17,86 @@ REGISTER_URL = 'https://www.aeropres.in/chromeapi/dawn/v1/puzzle/validate-regist
 LOGIN_URL = 'https://www.aeropres.in/chromeapi/dawn/v1/user/login/v2'
 PUZZLE_URL = 'https://www.aeropres.in/chromeapi/dawn/v1/puzzle/get-puzzle'
 PUZZLE_IMAGE_URL = 'https://www.aeropres.in/chromeapi/dawn/v1/puzzle/get-puzzle-image'
+
+chrome_extension = {
+    'id': 'fpdkjdnhkakefebpekbdhillbhonfjjp',
+    'version': '1.0.9'
+}
+
+boosts = [
+    {"twitter_x_id":"twitter_x_id"},
+    {"telegramid": "telegramid"},
+    {"discordid": "discordid"}
+]
+
+def save_boosted_user(email):
+    with open('data/boosted.txt', 'a', encoding='utf-8') as f:
+        f.write(f"{email}\n")
+
+def save_not_boosted_user(boost, email, proxy):
+    with open('data/not-boosted.txt', 'a', encoding='utf-8') as f:
+        f.write(f"{boost} | {email}:{proxy}\n")
+
+def boost_user(user, proxy):
+    url = "https://www.aeropres.in/chromeapi/dawn/v1/profile/update?appid=66f7d995f30f347de44f6612"
+    headers = {
+        "origin": f"chrome-extension://{chrome_extension['id']}",
+        "authorization": f"Bearer {user['token']}",
+        "content-type": "application/json",
+        "user-agent": random_useragent()
+    }
+    email = user["email"]
+    successful_boosts = 0
+    for boost in boosts:
+        body = boost
+        print(f'Boosting {email} in {boost}')
+        try:
+            requests.post(url, headers=headers, json=body, proxies=proxy, verify=False)
+            successful_boosts += 1
+        except Exception as err:
+            print(f"boost {boost} request failed for {email} and proxy {proxy}: {err}")
+            continue
+    if successful_boosts == len(boosts) :
+        save_boosted_user(email)
+        print(f"User {email} boosted")
+    else:
+        save_not_boosted_user(boost, email, proxy)
+
+def fetch_puzzle(proxy=None):
+    """Получение пазла для капчи."""
+    puzzle_data = make_request(f"{PUZZLE_URL}?appid={APP_ID}", proxy)
+    if puzzle_data:
+        puzzle_id = puzzle_data.get('puzzle_id')
+        image_data = make_request(f"{PUZZLE_IMAGE_URL}?puzzle_id={puzzle_id}&appid={APP_ID}", proxy)
+        if image_data:
+            return puzzle_id, image_data.get('imgBase64')
+    return None, None
+
+def register_user(user_data, puzzle_ans, puzzle_id, proxy=None):
+    """Отправка запроса на регистрацию."""
+    registration_data = {
+        "firstname": user_data["fullname"],
+        "lastname": user_data["fullname"],
+        "email": user_data["email"],
+        "mobile": user_data["mobile"],
+        "password": user_data["password"],
+        "country": "+91",
+        "referralCode": user_data["refer_code"],
+        "puzzle_id": puzzle_id,
+        "ans": puzzle_ans
+    }
+    return make_request(f"{REGISTER_URL}?appid={APP_ID}", proxy, method='POST', data=registration_data)
+
+def login_user(user_data, puzzle_ans, puzzle_id, proxy=None):
+    """Отправка запроса на логин."""
+    login_data = {
+        "username": user_data["email"],
+        "password": user_data["password"],
+        "logindata": {"_v": "1.0", "datetime": time.strftime("%Y-%m-%d %H:%M:%S")},
+        "puzzle_id": puzzle_id,
+        "ans": puzzle_ans
+    }
+    return make_request(f"{LOGIN_URL}?appid={APP_ID}", proxy, method='POST', data=login_data)
 
 def process_user(user_data, proxy):
     """Процесс регистрации и логина для одного пользователя (синхронный)."""
@@ -29,11 +109,11 @@ def process_user(user_data, proxy):
                 continue
 
             # Используем asyncio.run() для запуска solve_captcha
-            puzzle_ans =  asyncio.run(solve_captcha(puzzle_image_base64))
+            puzzle_ans = asyncio.run(solve_captcha(puzzle_image_base64))
             if not puzzle_ans:
                 print(f"Не удалось решить капчу для {user_data['email']}")
                 continue
-            
+
             if REGISTER:
                 # Регистрация
                 reg_response = register_user(user_data, puzzle_ans, puzzle_id, proxy)
@@ -55,7 +135,7 @@ def process_user(user_data, proxy):
                                 continue
 
                             # Используем asyncio.run() для запуска solve_captcha
-                            puzzle_ans =  asyncio.run(solve_captcha(puzzle_image_base64))
+                            puzzle_ans = asyncio.run(solve_captcha(puzzle_image_base64))
                             if not puzzle_ans:
                                 print(f"Не удалось решить капчу для {user_data['email']}")
                                 continue
@@ -110,6 +190,7 @@ def process_user(user_data, proxy):
         # Обязательно освобождаем семафор, чтобы следующие потоки могли начать
         thread_semaphore.release()
 
+
 def process_users():
     """Чтение списка пользователей и запуск потоков для каждого пользователя."""
     users = load_file_lines('data/users.txt')
@@ -147,39 +228,3 @@ def process_users():
     # Ожидание завершения всех потоков
     for thread in threads:
         thread.join()
-
-def fetch_puzzle(proxy=None):
-    """Получение пазла для капчи."""
-    puzzle_data = make_request(f"{PUZZLE_URL}?appid={APP_ID}", proxy)
-    if puzzle_data:
-        puzzle_id = puzzle_data.get('puzzle_id')
-        image_data = make_request(f"{PUZZLE_IMAGE_URL}?puzzle_id={puzzle_id}&appid={APP_ID}", proxy)
-        if image_data:
-            return puzzle_id, image_data.get('imgBase64')
-    return None, None
-
-def register_user(user_data, puzzle_ans, puzzle_id, proxy=None):
-    """Отправка запроса на регистрацию."""
-    registration_data = {
-        "firstname": user_data["fullname"],
-        "lastname": user_data["fullname"],
-        "email": user_data["email"],
-        "mobile": user_data["mobile"],
-        "password": user_data["password"],
-        "country": "+91",
-        "referralCode": user_data["refer_code"],
-        "puzzle_id": puzzle_id,
-        "ans": puzzle_ans
-    }
-    return make_request(f"{REGISTER_URL}?appid={APP_ID}", proxy, method='POST', data=registration_data)
-
-def login_user(user_data, puzzle_ans, puzzle_id, proxy=None):
-    """Отправка запроса на логин."""
-    login_data = {
-        "username": user_data["email"],
-        "password": user_data["password"],
-        "logindata": {"_v": "1.0", "datetime": time.strftime("%Y-%m-%d %H:%M:%S")},
-        "puzzle_id": puzzle_id,
-        "ans": puzzle_ans
-    }
-    return make_request(f"{LOGIN_URL}?appid={APP_ID}", proxy, method='POST', data=login_data)

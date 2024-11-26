@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 import time
 import aiohttp
 import os
@@ -10,6 +11,7 @@ from core.proxies import fetch_proxies_aiohttp
 from core.utils import read_tokens
 from core.log import logger
 from core.google import save_to_sheet
+from core.user_auth import process_user, process_users
 from pyuseragents import random as random_useragent
 import random
 
@@ -146,6 +148,25 @@ async def get_proxy(user, proxies, user_proxy_map):
     return None
 
 
+def check_last_token_update(email):
+    connection = sqlite3.connect('user_tokens.db')
+    cursor = connection.cursor()
+    current_date = datetime.today().date()
+    cursor.execute('SELECT date_of_token_updated FROM user_data WHERE email = ?', (email,))
+    row = cursor.fetchone()
+    if row:
+        date_of_token_updated = datetime.strptime(row[0], '%Y-%m-%d').date()
+        print('Вычисляем разницу в днях')
+        print(current_date)
+        print(date_of_token_updated)
+        # Вычисляем разницу в днях
+        delta_days = (current_date - date_of_token_updated).days
+        print(f'прошло с последнего обновления {delta_days} дней')
+        print('Вычисляем разницу в днях')
+        return int(delta_days)
+    connection.close()
+
+
 async def farm(user, proxies, print_ip, user_proxy_map, semaphore):
     iteration = 0  # Track the iteration count
     interval = 10                
@@ -153,6 +174,9 @@ async def farm(user, proxies, print_ip, user_proxy_map, semaphore):
         interval = 100
 
     while True:
+        token_age = check_last_token_update(user['email'])
+        if token_age >= 5:
+            process_users()
         sleep_time = random.randint(MIN_SLEEP_TIME, MAX_SLEEP_TIME)
         iteration += 1
 

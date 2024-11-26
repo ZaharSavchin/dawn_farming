@@ -74,12 +74,6 @@ def save_token_to_db(email, password, token):
     )
     ''')
 
-
-    # cursor.execute('''
-    # INSERT INTO user_data (email, password, token, date_of_token_updated)
-    # VALUES (?, ?, ?, ?)
-    # ''', (email, password, token, date_of_token_updated))
-
     cursor.execute('''
     INSERT INTO user_data (email, password, token, date_of_token_updated)
     VALUES (?, ?, ?, ?)
