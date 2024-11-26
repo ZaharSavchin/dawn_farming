@@ -1,3 +1,6 @@
+import datetime
+import sqlite3
+
 import requests
 import json
 import time
@@ -46,6 +49,51 @@ def save_token_to_file(email, token):
     with open('data/tokens.txt', 'a', encoding='utf-8') as f:
         f.write(f"{email}:{token}\n")
     print(f"Token saved for {email}")
+
+
+def save_token_to_db(email, password, token):
+    """Сохранение токена в SqlLite базу данных"""
+    date_of_token_updated = datetime.date.today().isoformat()
+
+    print('///SAVING TO DB///')
+    print(f'email = {email}\n'
+          f'password = {password}\n'
+          f'token = {token}\n'
+          f'data_of_token_updated = {date_of_token_updated}')
+    print('///SAVING TO DB///')
+
+    connection = sqlite3.connect('user_tokens.db')
+    cursor = connection.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS user_data (
+        email TEXT NOT NULL,
+        password TEXT NOT NULL,
+        token TEXT NOT NULL,
+        date_of_token_updated TEXT NOT NULL
+    )
+    ''')
+
+
+    # cursor.execute('''
+    # INSERT INTO user_data (email, password, token, date_of_token_updated)
+    # VALUES (?, ?, ?, ?)
+    # ''', (email, password, token, date_of_token_updated))
+
+    cursor.execute('''
+    INSERT INTO user_data (email, password, token, date_of_token_updated)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(email) DO UPDATE SET
+        password = excluded.password,
+        token = excluded.token,
+        date_of_token_updated = excluded.date_of_token_updated
+    ''', (email, password, token, date_of_token_updated))
+
+    connection.commit()
+    connection.close()
+
+
+
 
 def save_not_extracted_account(email, password):
     """Сохранение данных в файл."""

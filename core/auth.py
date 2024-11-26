@@ -5,7 +5,7 @@ from threading import Thread, Semaphore
 from core.boost import boost_user
 from core.proxies import fetch_proxies
 from core.google import wait_for_verification_link
-from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS, test_proxy
+from core.utils import load_file_lines, save_token_to_file, make_request, HEADERS, test_proxy, save_token_to_db
 from core.captcha import solve_captcha
 from data.config import MAX_RETRIES, RETRY_DELAY, REGISTER, MAX_THREADS, REF_CODE, BOOST_USERS
 
@@ -66,7 +66,12 @@ def process_user(user_data, proxy):
                             if login_response and login_response.get('data', {}).get('token'):
                                 token = login_response['data']['token']
                                 user_data['token'] = token
+
+                                print(f'user_data = {user_data}')
+
                                 save_token_to_file(user_data['email'], token)
+                                save_token_to_db(email=user_data['email'], password=user_data['password'], token=token)
+
                                 user = {
                                     'email': user_data['email'],
                                     'token': token,
@@ -89,7 +94,10 @@ def process_user(user_data, proxy):
                 if login_response and login_response.get('data', {}).get('token'):
                     token = login_response['data']['token']
                     user_data['token'] = token
+
                     save_token_to_file(user_data['email'], token)
+                    save_token_to_db(email=user_data['email'], password=user_data['password'], token=token)
+
                     user = {
                         'email': user_data['email'],
                         'token': token,
